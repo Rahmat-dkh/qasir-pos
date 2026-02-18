@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QASIR | Intelligent Retail System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        <? !=include('style');
+        ?>
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="loading-overlay hidden">
+        <div class="loader"></div>
+    </div>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-overlay">
+        <div class="login-wrapper">
+            <div class="login-left">
+                <h1>WELCOME</h1>
+                <h3>QASIR SMART POS</h3>
+                <p>Optimize your retail operations with our intelligent business suite. Experience real-time tracking
+                    and seamless transactions.</p>
+                <div class="shape-1"></div>
+                <div class="shape-2"></div>
+            </div>
+            <div class="login-right">
+                <div class="login-header">
+                    <h2>Sign in</h2>
+                    <p class="sub-t">Please enter your credentials to continue.</p>
+                </div>
+                <div class="login-form">
+                    <div class="f-group" style="margin-bottom: 20px;">
+                        <label>User Name</label>
+                        <input type="text" id="username" placeholder="Enter username" autocomplete="off">
+                    </div>
+                    <div class="f-group">
+                        <label>Password</label>
+                        <div style="position:relative;">
+                            <input type="password" id="password" placeholder="********" autocomplete="off"
+                                style="width: 100%; padding-right: 45px;">
+                            <i class='bx bx-hide' id="toggle-pass"
+                                style="position:absolute; right:15px; top:50%; transform:translateY(-50%); cursor:pointer; color:#64748b; font-size:20px;"
+                                onclick="toggleLoginPassword()"></i>
+                        </div>
+                    </div>
+                    <button onclick="handleLogin()" class="btn-signin" style="margin-top:20px;">Sign in</button>
+                    <p style="text-align:center; font-size:12px; color:var(--text-muted); margin-top:20px;">Use: admin /
+                        admin123</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div class="app-container hidden" id="main-app">
+        <aside class="sidebar">
+            <div class="logo-details"><i class='bx bxs-diamond'></i><span class="logo_name">QASIR</span></div>
+            <ul class="nav-list">
+                <li onclick="showSection('dashboard', event)" class="active" id="nav-dashboard">
+                    <a href="#"><i class='bx bx-home-alt-2'></i><span class="links_name">Insights</span></a>
+                </li>
+                <li onclick="showSection('cashier', event)" id="nav-cashier">
+                    <a href="#"><i class='bx bx-shopping-bag'></i><span class="links_name">Cashier</span></a>
+                </li>
+                <li onclick="showSection('inventory', event)" id="nav-inventory">
+                    <a href="#"><i class='bx bx-box'></i><span class="links_name">Inventory</span></a>
+                </li>
+                <li onclick="showSection('analytics', event)" id="nav-analytics">
+                    <a href="#"><i class='bx bx-pie-chart-alt-2'></i><span class="links_name">Analytics</span></a>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="u-name" id="user-display">User</div>
+                    <div class="u-role" id="role-display">Staff Access</div>
+                </div>
+                <i class='bx bx-power-off' onclick="handleLogout()"
+                    style="cursor:pointer; font-size: 22px; color: #f43f5e;"></i>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <h2 id="section-title">Dashboard Overview</h2>
+                    <div class="digital-clock"><i class='bx bx-time-five'></i> <span id="clock-text">00:00:00</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="icon-btn" onclick="toggleDarkMode()"><i class='bx bx-moon'></i></button>
+                </div>
+            </header>
+
+            <div class="content">
+                <!-- SECTIONS -->
+                <section id="sec-dashboard" class="page-section">
+                    <div class="stats-grid">
+                        <div class="stat-card blue">
+                            <div class="s-info"><span>REVENUE</span>
+                                <p id="stat-sales">Rp 0</p>
+                            </div><i class='bx bx-wallet'></i>
+                        </div>
+                        <div class="stat-card green">
+                            <div class="s-info"><span>ORDERS</span>
+                                <p id="stat-orders">0</p>
+                            </div><i class='bx bx-receipt'></i>
+                        </div>
+                        <div class="stat-card orange">
+                            <div class="s-info"><span>LOW STOCK</span>
+                                <p id="stat-low-stock">0</p>
+                            </div><i class='bx bx-error'></i>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top:20px;">
+                        <div class="card">
+                            <h3>Sales Performance</h3>
+                            <div class="chart-box"><canvas id="salesChart"></canvas></div>
+                        </div>
+                        <div class="card">
+                            <h3>Top Products</h3>
+                            <div id="top-products-list"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="sec-cashier" class="page-section hidden">
+                    <div class="cashier-wrapper">
+                        <div class="product-selection">
+                            <div class="search-bar"><i class='bx bx-search'></i><input type="text"
+                                    id="cashier-search-input" placeholder="Search..." onkeyup="filterCashierItems()">
+                            </div>
+                            <div class="product-grid" id="cashier-items"></div>
+                        </div>
+                        <div class="cart-panel">
+                            <h3>Cart</h3>
+                            <div class="cart-items" id="cart-list-container"></div>
+                            <div class="cart-footer">
+                                <div class="total-line"><span>TOTAL</span><b id="cart-total-display">Rp 0</b></div>
+                                <select id="pay-method"
+                                    style="margin-bottom:15px; width:100%; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                                    <option value="Cash">Cash</option>
+                                    <option value="Debit">Debit</option>
+                                    <option value="QRIS">QRIS</option>
+                                </select>
+                                <button class="btn-checkout" onclick="checkout()">PLACE ORDER</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="sec-inventory" class="page-section hidden">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                        <button class="btn-primary" onclick="openProductModal()">+ NEW PRODUCT</button>
+                        <input type="text" id="inv-search" placeholder="Filter..." onkeyup="filterInventoryTable()"
+                            style="padding:10px; border-radius:8px; border:1px solid #ddd;">
+                    </div>
+                    <table class="pos-table">
+                        <thead>
+                            <tr>
+                                <th>NAME</th>
+                                <th>BARCODE</th>
+                                <th>CATEGORY</th>
+                                <th>PRICE</th>
+                                <th>STOCK</th>
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body"></tbody>
+                    </table>
+                </section>
+
+                <section id="sec-analytics" class="page-section hidden">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                        <h3>Reports</h3><button class="btn-primary" onclick="exportData()">EXPORT CSV</button>
+                    </div>
+                    <table class="pos-table">
+                        <thead>
+                            <tr>
+                                <th>INVOICE</th>
+                                <th>DATE</th>
+                                <th>TOTAL</th>
+                                <th>METHOD</th>
+                                <th>CASHIER</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    <div id="product-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Product Details</h3><i class='bx bx-x' onclick="closeProductModal()"
+                    style="font-size:30px; cursor:pointer;"></i>
+            </div>
+            <form id="product-form" class="modal-body">
+                <input type="hidden" id="f-id">
+                <div class="f-group"><label>Name</label><input type="text" id="f-name" required></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="f-group"><label>Price</label><input type="number" id="f-price" required></div>
+                    <div class="f-group"><label>Stock</label><input type="number" id="f-stock" required></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="f-group"><label>Barcode</label><input type="text" id="f-barcode"></div>
+                    <div class="f-group"><label>Category</label><select id="f-category">
+                            <option value="Makanan">Makanan</option>
+                            <option value="Minuman">Minuman</option>
+                        </select></div>
+                </div>
+                <div class="f-group"><label>Image URL</label><input type="text" id="f-img"></div>
+                <div class="modal-footer"><button type="submit" class="btn-primary">SAVE</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="invoice-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:350px; text-align:center; padding:30px;">
+            <i class='bx bx-check-circle' style="font-size:60px; color:var(--success);"></i>
+            <h2>Success!</h2>
+            <p id="inv-modal-id"></p>
+            <button onclick="closeInvoiceModal()"
+                style="background:none; border:none; cursor:pointer; font-weight:700; color:#64748b;">DONE</button>
+        </div>
+    </div>
+
+    <script><?!= include('script'); ?></script>
+</body>
+
+</html>

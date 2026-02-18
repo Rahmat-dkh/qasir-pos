@@ -1,0 +1,407 @@
+/**
+* POS PRO - Core Application Logic
+*/
+
+let allProducts = [], cart = [], currentUser = null, salesChart = null;
+
+/* 1. SYSTEM INIT */
+window.onload = () => {
+startClock();
+loadInitialData();
+};
+
+function startClock() {
+setInterval(() => {
+const el = document.getElementById('clock-text');
+if (el) el.innerText = new Date().toLocaleTimeString('id-ID', { hour12: false });
+}, 1000);
+}
+
+function loadInitialData() {
+google.script.run.withSuccessHandler(p => {
+allProducts = p;
+}).getProducts();
+}
+
+/* 2. NAVIGATION SYSTEMS */
+function showSection(id, event) {
+if (event) event.preventDefault();
+
+// Update UI
+document.querySelectorAll('.page-section').forEach(s => s.classList.add('hidden'));
+document.querySelectorAll('.nav-list li').forEach(l => l.classList.remove('active'));
+
+const targetSection = document.getElementById('sec-' + id);
+const targetNav = document.getElementById('nav-' + id);
+
+if (targetSection) targetSection.classList.remove('hidden');
+if (targetNav) targetNav.classList.add('active');
+
+const titles = {
+'dashboard': 'Insights Overview',
+'cashier': 'Main Cashier Terminal',
+'inventory': 'Inventory Master Control',
+'analytics': 'Sales Business Analytics'
+};
+const titleEl = document.getElementById('section-title');
+if (titleEl) titleEl.innerText = titles[id] || id;
+
+// Refresh Data
+if (id === 'dashboard') refreshDashboard();
+else if (id === 'cashier') refreshCashier();
+else if (id === 'inventory') refreshInventory();
+else if (id === 'analytics') refreshHistory();
+}
+
+/* 3. AUTHENTICATION */
+function handleLogin() {
+const u = document.getElementById('username').value;
+const p = document.getElementById('password').value;
+
+if (!u || !p) {
+return notify("Masukkan Username dan Password.");
+}
+
+showLoading(true);
+google.script.run
+.withSuccessHandler(res => {
+showLoading(false);
+if (res.success) {
+currentUser = res;
+document.getElementById('login-overlay').classList.add('hidden');
+document.getElementById('main-app').classList.remove('hidden');
+document.getElementById('user-display').innerText = res.username;
+
+const roleEl = document.getElementById('role-display');
+if (roleEl) {
+roleEl.innerText = (res.role === 'admin' ? 'Master Administrator' : 'Sales Staff');
+}
+
+refreshDashboard();
+} else {
+notify(res.message || "Gagal Login.");
+}
+})
+.withFailureHandler(err => {
+showLoading(false);
+notify("Koneksi Error: " + err.message);
+})
+.login(u, p);
+}
+
+function handleLogout() {
+if (!confirm("Terminate current session?")) return;
+currentUser = null;
+document.getElementById('login-overlay').classList.remove('hidden');
+document.getElementById('main-app').classList.add('hidden');
+}
+
+function toggleLoginPassword() {
+const passInput = document.getElementById('password');
+const icon = document.getElementById('toggle-pass');
+
+if (passInput.type === 'password') {
+passInput.type = 'text';
+icon.classList.remove('bx-hide');
+icon.classList.add('bx-show');
+} else {
+passInput.type = 'password';
+icon.classList.remove('bx-show');
+icon.classList.add('bx-hide');
+}
+}
+
+/* 4. DATA REFRESHERS */
+function refreshDashboard() {
+google.script.run.withSuccessHandler(data => {
+if (!data) return;
+animateValue('stat-sales', data.totalSales, "Rp ");
+animateValue('stat-orders', data.totalOrders);
+animateValue('stat-low-stock', data.lowStock);
+
+const list = document.getElementById('top-products-list');
+if (data.topProducts && data.topProducts.length > 0) {
+list.innerHTML = data.topProducts.map(p => `
+<div class="top-item-row"
+    style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
+    <div><b>${p.name}</b><br><small>${p.count} sold</small></div>
+    <div style="font-weight:700;">Rp ${p.revenue.toLocaleString()}</div>
+</div>
+`).join('');
+} else {
+list.innerHTML = '<div style="text-align:center; padding: 20px;">No data.</div>';
+}
+renderSalesChart();
+}).getDashboardData();
+}
+
+function refreshCashier() {
+showLoading(true);
+google.script.run.withSuccessHandler(p => {
+allProducts = p;
+showLoading(false);
+renderCashierGrid();
+}).getProducts();
+}
+
+function refreshInventory() {
+showLoading(true);
+google.script.run.withSuccessHandler(p => {
+allProducts = p;
+showLoading(false);
+renderInventoryTable();
+}).getProducts();
+}
+
+function refreshHistory() {
+showLoading(true);
+google.script.run.withSuccessHandler(history => {
+showLoading(false);
+renderHistoryTable(history);
+}).getTransactionsHistory();
+}
+
+/* 5. RENDERING */
+function renderCashierGrid(filtered = null) {
+const cont = document.getElementById('cashier-items');
+const items = filtered || allProducts;
+if (items.length === 0) {
+cont.innerHTML = "<div style='grid-column: 1/-1; padding:50px; text-align:center;'>No items found.</div>";
+return;
+}
+cont.innerHTML = items.map(p => `
+<div class="prod-item" onclick="addToCart('${p.id}')"
+    style="cursor:pointer; border:1px solid #eee; padding:10px; border-radius:10px; text-align:center;">
+    <img src="${p.imageurl || 'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?w=400'}"
+        style="width:100%; height:100px; object-fit:cover; border-radius:8px;">
+    <div style="font-weight:700; margin-top:10px;">${p.name}</div>
+    <div style="color:var(--primary);">Rp ${p.price.toLocaleString()}</div>
+    <small>Stock: ${p.stock}</small>
+</div>
+`).join('');
+}
+
+function renderInventoryTable() {
+const body = document.getElementById('inventory-table-body');
+body.innerHTML = allProducts.map(p => `
+<tr>
+    <td>${p.name}</td>
+    <td>${p.barcode || '-'}</td>
+    <td>${p.category}</td>
+    <td>Rp ${p.price.toLocaleString()}</td>
+    <td>${p.stock}</td>
+    <td>
+        <button onclick="editProduct('${p.id}')"><i class='bx bx-pencil'></i></button>
+        <button onclick="deleteProd('${p.id}')" style="color:red;"><i class='bx bx-trash'></i></button>
+    </td>
+</tr>
+`).join('');
+}
+
+function renderHistoryTable(history) {
+const body = document.getElementById('history-table-body');
+if (!history || history.length === 0) {
+body.innerHTML = "<tr>
+    <td colspan='5' align='center'>No transactions.</td>
+</tr>";
+return;
+}
+body.innerHTML = history.map(h => `
+<tr>
+    <td>${h.invoiceid}</td>
+    <td>${h.date}</td>
+    <td>Rp ${parseFloat(h.grandtotal).toLocaleString()}</td>
+    <td>${h.paymentmethod}</td>
+    <td>${h.cashier}</td>
+</tr>
+`).join('');
+}
+
+/* 6. CART & CHECKOUT */
+function addToCart(id) {
+const p = allProducts.find(x => x.id === id);
+if (p.stock <= 0) return notify("Stock Habis."); const ex=cart.find(c=> c.id === id);
+    if (ex) {
+    if (ex.quantity >= p.stock) return notify("Stock Tidak Mencukupi.");
+    ex.quantity++;
+    ex.subtotal = ex.quantity * ex.price;
+    } else {
+    cart.push({ id: p.id, name: p.name, price: p.price, quantity: 1, subtotal: p.price });
+    }
+    updateCartUI();
+    }
+
+    function updateCartUI() {
+    const container = document.getElementById('cart-list-container');
+    if (cart.length === 0) {
+    container.innerHTML = "<p style='text-align:center; padding:20px;'>Cart is empty</p>";
+    } else {
+    container.innerHTML = cart.map((c, i) => `
+    <div
+        style="display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
+        <div><b>${c.name}</b><br><small>${c.quantity} x Rp ${c.price.toLocaleString()}</small></div>
+        <div style="text-align:right;">
+            <div>Rp ${c.subtotal.toLocaleString()}</div>
+            <button onclick="removeItem(${i})"
+                style="color:red; border:none; background:none; cursor:pointer;">&times;</button>
+        </div>
+    </div>
+    `).join('');
+    }
+    const total = cart.reduce((a, b) => a + b.subtotal, 0);
+    document.getElementById('cart-total-display').innerText = "Rp " + total.toLocaleString();
+    }
+
+    function removeItem(idx) {
+    cart.splice(idx, 1);
+    updateCartUI();
+    }
+
+    function checkout() {
+    if (cart.length === 0) return notify("Cart Kosong.");
+
+    showLoading(true);
+    const total = cart.reduce((a, b) => a + b.subtotal, 0);
+    const payload = {
+    items: [...cart],
+    total: total,
+    tax: 0,
+    discount: 0,
+    grandTotal: total,
+    paymentMethod: document.getElementById('pay-method').value,
+    cashier: currentUser.username
+    };
+
+    google.script.run
+    .withSuccessHandler((res) => {
+    showLoading(false);
+    if (res.success) {
+    document.getElementById('inv-modal-id').innerText = "Invoice: " + res.invoiceId;
+    document.getElementById('invoice-modal').classList.remove('hidden');
+    cart = [];
+    updateCartUI();
+    refreshCashier();
+    }
+    })
+    .processTransaction(payload);
+    }
+
+    function closeInvoiceModal() {
+    document.getElementById('invoice-modal').classList.add('hidden');
+    }
+
+    /* 7. PRODUCT MODAL */
+    function openProductModal() {
+    document.getElementById('product-form').reset();
+    document.getElementById('f-id').value = "";
+    document.getElementById('product-modal').classList.remove('hidden');
+    }
+
+    function closeProductModal() {
+    document.getElementById('product-modal').classList.add('hidden');
+    }
+
+    function editProduct(id) {
+    const p = allProducts.find(x => x.id === id);
+    document.getElementById('f-id').value = p.id;
+    document.getElementById('f-name').value = p.name;
+    document.getElementById('f-price').value = p.price;
+    document.getElementById('f-stock').value = p.stock;
+    document.getElementById('f-barcode').value = p.barcode || "";
+    document.getElementById('f-category').value = p.category;
+    document.getElementById('f-img').value = p.imageurl || "";
+    document.getElementById('product-modal').classList.remove('hidden');
+    }
+
+    document.getElementById('product-form').onsubmit = (e) => {
+    e.preventDefault();
+    const data = {
+    id: document.getElementById('f-id').value,
+    name: document.getElementById('f-name').value,
+    price: parseFloat(document.getElementById('f-price').value),
+    stock: parseInt(document.getElementById('f-stock').value),
+    barcode: document.getElementById('f-barcode').value,
+    category: document.getElementById('f-category').value,
+    imageurl: document.getElementById('f-img').value
+    };
+    showLoading(true);
+    google.script.run.withSuccessHandler(() => {
+    showLoading(false);
+    closeProductModal();
+    refreshInventory();
+    notify("Data tersimpan.");
+    }).saveProduct(data);
+    };
+
+    function deleteProd(id) {
+    if (!confirm("Hapus produk ini?")) return;
+    showLoading(true);
+    google.script.run.withSuccessHandler(() => {
+    showLoading(false);
+    refreshInventory();
+    notify("Terhapus.");
+    }).deleteProduct(id);
+    }
+
+    /* 8. UTILS */
+    function filterCashierItems() {
+    const q = document.getElementById('cashier-search-input').value.toLowerCase();
+    const res = allProducts.filter(p => p.name.toLowerCase().includes(q) || (p.barcode &&
+    p.barcode.toLowerCase().includes(q)));
+    renderCashierGrid(res);
+    }
+
+    function filterInventoryTable() {
+    const q = document.getElementById('inv-search').value.toLowerCase();
+    const rows = document.querySelectorAll('#inventory-table-body tr');
+    rows.forEach(row => {
+    row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
+    }
+
+    function exportData() {
+    showLoading(true);
+    google.script.run.withSuccessHandler(url => {
+    showLoading(false);
+    if (!url) return notify("Tidak ada data.");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Report.csv";
+    a.click();
+    }).exportToCSV();
+    }
+
+    function animateValue(id, val, prefix = "") {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerText = prefix + val.toLocaleString();
+    }
+
+    function renderSalesChart() {
+    google.script.run.withSuccessHandler(data => {
+    const ctx = document.getElementById('salesChart');
+    if (!ctx || !data) return;
+    if (salesChart) salesChart.destroy();
+    salesChart = new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: {
+    labels: data.labels,
+    datasets: [{ label: 'Sales', data: data.values, borderColor: '#6366f1', tension: 0.4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+    });
+    }).getSalesChartData();
+    }
+
+    function showLoading(s) {
+    const el = document.getElementById('loading');
+    if (el) el.classList.toggle('hidden', !s);
+    }
+
+    function notify(m) {
+    alert(m);
+    }
+
+    function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    }
