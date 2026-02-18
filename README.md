@@ -37,9 +37,7 @@ QASIR adalah sistem Point of Sale (POS) modern berbasis cloud yang dibangun meng
 
 4. **Inisialisasi Database**:
    - Saat pertama kali dijalankan, script akan otomatis membuat sheet: `Products`, `Transactions`, `Details`, dan `Users`.
-   - **Default Credentials**:
-     - **Username**: `admin`
-     - **Password**: `admin123`
+   - Gunakan kredensial admin yang telah dikonfigurasi pada saat setup database pertama kali.
 
 ## 🔒 Keamanan
 Proyek ini dikonfigurasi untuk menyembunyikan logika database di sisi server (Google Apps Script). Jangan pernah membagikan URL spreadsheet asli Anda kepada publik. Gunakan fitur **Test Deployments** untuk pengembangan lokal.
